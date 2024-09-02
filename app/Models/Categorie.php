@@ -19,4 +19,7 @@ class Categorie extends Model
     {
         return $this->hasMany(Categorie::class, 'parent_id');
     }
+    public function filters(){
+        return $this->hasMany(Filter::class,'category_id');
+    }
 }

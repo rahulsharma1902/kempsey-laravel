@@ -12,84 +12,149 @@ class FiltersController extends Controller
 {
     //
     // FilterController.php
-public function store(Request $request)
-{
-    // Define validation rules
-    $rules = [
-        'name' => [
-            'required',
-            Rule::unique('filters', 'name')->where(function ($query) use ($request) {
-                return $query->where('category_id', $request->category_id);
-            })->ignore($request->id)
-        ],
-        'slug' => [
-            'required',
-            Rule::unique('filters', 'slug')->where(function ($query) use ($request) {
-                return $query->where('category_id', $request->category_id);
-            })->ignore($request->id)
-        ],
-        'category_id' => 'required|exists:categories,id',
-        'options' => 'required|json', // Ensure options is valid JSON
-    ];
-
-    // Validate the incoming request data
-    $validatedData = $request->validate($rules);
-
-    // Decode JSON options into an array
-    $options = json_decode($validatedData['options'], true);
-
-    try {
-        // Begin transaction to ensure data integrity
-        DB::beginTransaction();
-
-        // Check if the request has an ID, indicating an update operation
-        if ($request->id) {
-            // Find the filter by ID or fail
-            $filter = Filter::findOrFail($request->id);
-        } else {
-            // Otherwise, create a new filter instance
+    public function store(Request $request)
+    {
+        $rules = [
+            'name' => [
+                'required',
+                Rule::unique('filters', 'name')->where(function ($query) use ($request) {
+                    return $query->where('category_id', $request->category_id);
+                })
+            ],
+            'slug' => [
+                'required',
+                Rule::unique('filters', 'slug')->where(function ($query) use ($request) {
+                    return $query->where('category_id', $request->category_id);
+                })
+            ],
+            'category_id' => 'required|exists:categories,id',
+            'options' => 'required|json', // Ensure options is valid JSON
+        ];
+    
+        $validatedData = $request->validate($rules);
+    
+        $options = json_decode($validatedData['options'], true);
+    
+        try {
+            DB::beginTransaction();
+    
             $filter = new Filter();
+            $filter->name = $validatedData['name'];
+            $filter->slug = $validatedData['slug'];
+            $filter->category_id = $validatedData['category_id'];
+            $filter->save();
+    
+            foreach ($options as $optionName) {
+                $option = new FilterOption();
+                $option->filter_id = $filter->id;
+                $option->name = $optionName;
+                $option->save();
+            }
+    
+            DB::commit();
+    
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully added filter',
+                'data' => $filter
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+    
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
         }
+    }
+    
 
-        // Set the filter's attributes from the validated data
-        $filter->name = $validatedData['name'];
-        $filter->slug = $validatedData['slug'];
-        $filter->category_id = $validatedData['category_id'];
+public function update(Request $request)
+{
+    $id = $request->id;
+    if($id){
+        $rules = [
+            'name' => [
+                'required',
+                Rule::unique('filters', 'name')->where(function ($query) use ($request) {
+                    return $query->where('category_id', $request->category_id);
+                })->ignore($id)
+            ],
+            'slug' => [
+                'required',
+                Rule::unique('filters', 'slug')->where(function ($query) use ($request) {
+                    return $query->where('category_id', $request->category_id);
+                })->ignore($id)
+            ],
+            'category_id' => 'required|exists:categories,id',
+            'options' => 'required|json', // Ensure options is valid JSON
+        ];
 
-        // Save the filter to the database
-        $filter->save();
+        $validatedData = $request->validate($rules);
 
-        // Process filter options
-        FilterOption::where('filter_id', $filter->id)->delete(); // Remove existing options before saving new ones
+        $options = json_decode($validatedData['options'], true);
 
-        foreach ($options as $optionName) {
-            $option = new FilterOption();
-            $option->filter_id = $filter->id; // Assign the filter ID to the option
-            $option->name = $optionName;
-            $option->save();
+        try {
+            DB::beginTransaction();
+
+            $filter = Filter::findOrFail($id);
+            $filter->name = $validatedData['name'];
+            $filter->slug = $validatedData['slug'];
+            $filter->category_id = $validatedData['category_id'];
+            $filter->save();
+
+            // Update filter options
+            $existingOptions = collect($options)->filter(function($option) {
+                return isset($option['id']);
+            });
+
+            $newOptions = collect($options)->filter(function($option) {
+                return !isset($option['id']);
+            });
+
+            $existingOptionIds = $existingOptions->pluck('id')->toArray();
+            FilterOption::where('filter_id', $filter->id)
+                ->whereNotIn('id', $existingOptionIds)
+                ->delete();
+
+            foreach ($existingOptions as $optionData) {
+                $option = FilterOption::findOrFail($optionData['id']);
+                $option->name = $optionData['name'];
+                $option->save();
+            }
+
+            foreach ($newOptions as $optionData) {
+                $option = new FilterOption();
+                $option->filter_id = $filter->id;
+                $option->name = $optionData['name'];
+                $option->save();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully updated filter',
+                'data' => $filter
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
         }
-
-        // Commit transaction
-        DB::commit();
-
-        // Return a successful JSON response
-        return response()->json([
-            'success' => true,
-            'message' => $request->id ? 'Successfully updated filter' : 'Successfully added filter',
-            'data' => $filter
-        ], 200);
-
-    } catch (\Exception $e) {
-        // Rollback transaction in case of error
-        DB::rollBack();
-
-        // Return an error JSON response
+    }else{
         return response()->json([
             'success' => false,
             'message' => 'An error occurred: ' . $e->getMessage()
         ], 500);
     }
 }
+
+
 
 public function getFilters(Request $request){
     try {
@@ -121,5 +186,39 @@ public function getFilters(Request $request){
                 'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
         } 
+    }
+
+
+    public function removeFilter(Request $request, $id)
+    {
+        if (!$id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Filter ID is required.'
+            ], 400);
+        }
+    
+        $filter = Filter::find($id);
+    
+        if (!$filter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Filter not found.'
+            ], 404);
+        }
+    
+        try {
+            $filter->delete();
+            return response()->json([
+                'success' => true,
+                'data' => 'Filter successfully removed.'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while removing the filter.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

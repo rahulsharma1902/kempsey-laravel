@@ -57,7 +57,23 @@ class CategoriesController extends Controller
             ], 500);
         }
     }
-    
+    public function categories(Request $request)
+    {
+        try {
+            $categories = Categorie::where('visibility', 'enabled')->with('filters','filters.filterOptions')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $categories
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
     
 
     public function activeParentCategories(Request $request)
