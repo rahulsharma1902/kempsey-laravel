@@ -14,4 +14,9 @@ class Service extends Model
     public function serviceOptions() {
         return $this->hasMany(ServiceOption::class, 'service_id', 'id');
     }
+    public function storeServices()
+    {
+        return $this->hasMany(StoreServices::class, 'service_id');
+    }
+    
 }

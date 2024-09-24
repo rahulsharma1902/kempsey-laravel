@@ -15,4 +15,9 @@ class ServiceType extends Model
     {
         return $this->belongsToMany(ServiceOption::class, 'service_option_service_type', 'service_type_id', 'service_option_id');
     }
+    public function storeServices()
+    {
+        return $this->hasMany(StoreServices::class, 'service_type_id');
+    }
+    
 }

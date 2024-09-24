@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Filter;
+use App\Models\Categorie;
 use App\Models\FilterOption;
 use DB;
 use Illuminate\Validation\Rule;
@@ -221,4 +222,47 @@ public function getFilters(Request $request){
             ], 500);
         }
     }
+
+
+    public function getFilterByCategory(Request $request, $slug)
+{
+    try {
+        // Find the category by slug
+        $category = Categorie::where('slug', $slug)->first();
+
+        // Check if the category exists
+        if (!$category) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Category not found'
+            ], 404);
+        }
+
+        // Check if the category has a parent ID
+        if (is_null($category->parent_id)) {
+            // Parent ID is null, so this is a top-level category
+            $filters = Filter::with('filterOptions', 'Categorie')
+                ->where('category_id', $category->id) // Get filters associated with this category
+                ->get();
+        } else {
+            // Parent ID is not null, so get filters for this category and its parent
+            $filters = Filter::with('filterOptions', 'Categorie')
+                ->where('category_id', $category->id)
+                ->orWhere('category_id', $category->parent_id)
+                ->get();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $filters
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'An error occurred: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
 }

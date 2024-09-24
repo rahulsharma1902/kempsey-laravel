@@ -44,51 +44,43 @@ class ServiceController extends Controller
         }
     }
     public function getServices(Request $request)
-{
-    try {
-        // Fetch services with serviceTypes and serviceOptions
-        $services = Service::with(['serviceTypes', 'serviceOptions'])->get();
-
-        // Enhance serviceTypes with serviceOptions
-        $services->each(function ($service) {
-            $service->serviceTypes->each(function ($serviceType) use ($service) {
-                // Fetch service options associated with this service type
-                $serviceType->serviceOptions = ServiceOption::where('service_id', $service->id)
-                    ->whereJsonContains('service_type_ids', $serviceType->id)
-                    ->get();
+    {
+        try {
+            // Fetch services with serviceTypes and serviceOptions
+            $services = Service::with(['serviceTypes', 'serviceOptions'])->get();
+    
+            // Enhance serviceTypes with serviceOptions
+            $services->each(function ($service) {
+                $service->serviceTypes->each(function ($serviceType) use ($service) {
+                    // Manually convert the JSON string to an array
+                    $serviceOptions = ServiceOption::where('service_id', $service->id)
+                        ->get()
+                        ->filter(function ($option) use ($serviceType) {
+                            // Convert service_type_ids string to array
+                            $serviceTypeIds = json_decode($option->service_type_ids, true);
+                            // Check if the current serviceType id is in the array
+                            return is_array($serviceTypeIds) && in_array($serviceType->id, $serviceTypeIds);
+                        })->values()->toArray(); // Convert the collection to an array
+    
+                    // Assign filtered service options back to serviceType
+                    $serviceType->serviceOptions = $serviceOptions;
+                });
             });
-        });
-
-        return response()->json([
-            'success' => true,
-            'data' => $services
-        ], 200);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'An error occurred: ' . $e->getMessage()
-        ], 500);
+    
+            return response()->json([
+                'success' => true,
+                'data' => $services
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
-
     
 
-    // public function getServices(Request $request){
-    //     try {
-    //         $services = Service::with('serviceTypes','serviceOptions')->get();
 
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'data' => $services
-    //         ], 200);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'An error occurred: ' . $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
     public function getServiceById(Request $request, $id){
         try {
             $service = Service::where('id',$id)->first();
@@ -235,51 +227,82 @@ class ServiceController extends Controller
             ], 500);
         }  
     }
+    public function getServiceType(Request $request){
+        try {
+            $serviceType = ServiceType::all();
 
+            return response()->json([
+                'success' => true,
+                'data' => $serviceType
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }  
+    }
+    public function getServiceTypesByArray(Request $request)
+    {
+        return response()->json(gettype($request->all()));
+        $typeIds = $request->input('type_ids', []);
+        try {
+            $serviceTypes = ServiceType::whereIn('id', $typeIds)->get();
 
+            return response()->json([
+                'success' => true,
+                'data' => $serviceTypes
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }  
+    }
 
 
     // addServiceOption
 
     public function addServiceOption(Request $request)
-{
-    $rules = [
-        'name' => 'required|unique:service_options,name' . ($request->id ? ',' . $request->id : ''),
-        'slug' => 'required|unique:service_options,slug' . ($request->id ? ',' . $request->id : ''),
-        'service_id' => 'required|exists:services,id',
-    ];
+    {
+        $rules = [
+            'name' => 'required|unique:service_options,name' . ($request->id ? ',' . $request->id : ''),
+            'slug' => 'required|unique:service_options,slug' . ($request->id ? ',' . $request->id : ''),
+            'service_id' => 'required|exists:services,id',
+        ];
 
-    $validatedData = $request->validate($rules);
+        $validatedData = $request->validate($rules);
 
-    try {
-        if ($request->id) {
-            $ServiceOption = ServiceOption::findOrFail($request->id);
-        } else {
-            $ServiceOption = new ServiceOption();
+        try {
+            if ($request->id) {
+                $ServiceOption = ServiceOption::findOrFail($request->id);
+            } else {
+                $ServiceOption = new ServiceOption();
+            }
+
+            $ServiceOption->name = $validatedData['name'];
+            $ServiceOption->slug = $validatedData['slug'];
+            $ServiceOption->service_id = $validatedData['service_id'];
+            
+            $serviceTypeIds = json_decode($request->service_type_ids, true);
+            $ServiceOption->service_type_ids = json_encode($serviceTypeIds); // Encode the array as JSON
+
+            $ServiceOption->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => $request->id ? 'Successfully updated ServiceOption' : 'Successfully added ServiceOption',
+                'data' => $ServiceOption
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
         }
-
-        $ServiceOption->name = $validatedData['name'];
-        $ServiceOption->slug = $validatedData['slug'];
-        $ServiceOption->service_id = $validatedData['service_id'];
-        
-        $serviceTypeIds = json_decode($request->service_type_ids, true);
-        $ServiceOption->service_type_ids = json_encode($serviceTypeIds); // Encode the array as JSON
-
-        $ServiceOption->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => $request->id ? 'Successfully updated ServiceOption' : 'Successfully added ServiceOption',
-            'data' => $ServiceOption
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'An error occurred: ' . $e->getMessage()
-        ], 500);
     }
-}
 
     public function getServiceOptionById(Request $request,$id){
         try {

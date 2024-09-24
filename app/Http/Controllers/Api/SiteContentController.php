@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\SiteContent;
+use App\Models\ContactUsContent;
+use App\Models\WorkshopContent;
 
 class SiteContentController extends Controller
 {
@@ -104,7 +106,7 @@ class SiteContentController extends Controller
             }
         }
         
-        foreach ($request->input('footer_instagram_images',[]) as  $index => $details) {
+        foreach ($request->file('footer_instagram_images',[]) as  $index => $details) {
             
             if ($request->hasFile("footer_instagram_images.$index")) {
                 $file = $request->file("footer_instagram_images.$index");
@@ -129,5 +131,104 @@ class SiteContentController extends Controller
 
     private function isUrl($string) {
         return filter_var($string, FILTER_VALIDATE_URL) !== false;
+    }
+
+    public function ContactUsContent(Request $request){
+        try {
+            $contactuscontent = ContactUsContent::first();
+
+            return response()->json([
+                'success' => true,
+                'data' => $contactuscontent
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function storeContactData(Request $request) {
+
+        $validated = $request->validate([
+            'sub_heading' => 'required',
+            'heading' => 'required',
+            'content_heading' => 'required',
+            'content_sub_heading' => 'required',
+        ]);
+
+        // return $request->all();
+    
+        $contactuscontent = ContactUsContent::firstOrNew();
+    
+        $contactuscontent->sub_heading = $request->sub_heading;
+        $contactuscontent->heading = $request->heading;
+        $contactuscontent->content_heading = $request->content_heading;
+        $contactuscontent->content_sub_heading = $request->content_sub_heading;
+        $contactuscontent->banner_image_url = $this->upload($request, 'banner_image_url', $contactuscontent->banner_image_url);
+       
+        $contactuscontent->save();
+        return response()->json([
+            'message' => 'Contact us content changed successfully!',
+            'data' => $contactuscontent
+        ]);
+    }
+    
+    public function WorkshopContent(Request $request){
+        try {
+            $workshopcontent = WorkshopContent::first();
+
+            return response()->json([
+                'success' => true,
+                'data' => $workshopcontent
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function storeWorkshopData(Request $request) {
+
+        $validated = $request->validate([
+            'sub_heading' => 'required',
+            'heading' => 'required',
+            'content_heading' => 'required',
+            'content_text' => 'required',
+            'content_title' => 'required',
+            'button_text' => 'required',
+            'description' => 'required',
+        ]);
+
+        $workshopcontent = WorkshopContent::firstOrNew();
+    
+        $workshopcontent->sub_heading = $request->sub_heading;
+        $workshopcontent->heading = $request->heading;
+        $workshopcontent->content_heading = $request->content_heading;
+        $workshopcontent->content_title = $request->content_title;
+        $workshopcontent->content_text = $request->content_text;
+        $workshopcontent->button_text = $request->button_text;
+        $workshopcontent->description = $request->description;
+        $workshopcontent->banner_image_url = $this->upload($request, 'banner_image_url', $workshopcontent->banner_image_url);
+       
+        $workshopcontent->save();
+        return response()->json([
+            'message' => 'workshop content changed successfully!',
+            'data' => $workshopcontent
+        ]);
+    }
+    
+    public function upload(Request $request, $fieldName, $currentFilePath = null) {
+        if ($request->hasFile($fieldName)) {
+            $file = $request->file($fieldName);
+            $filename = $fieldName . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('site_images'), $filename);
+
+            return asset('site_images/' . $filename);
+        }
+        return $currentFilePath;
     }
 }

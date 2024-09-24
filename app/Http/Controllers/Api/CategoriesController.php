@@ -154,23 +154,54 @@ class CategoriesController extends Controller
     
 
 
-    public function getCategoryById(Request $request, $id){
-        try {
-            $categories = Categorie::where('id',$id)
-                ->first();
+    // public function getCategoryById(Request $request, $id){
+    //     try {
+    //         $categories = Categorie::where('id',$id)
+    //             ->first();
 
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => $categories
+    //         ], 200);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'An error occurred: ' . $e->getMessage()
+    //         ], 500);
+    //     } 
+    // }
+    public function getCategoryById(Request $request, $identifier)
+    {
+        try {
+            // $categorie = is_numeric($identifier) 
+            //     ? Categorie::with('children')->where('id', $identifier)->first()->toArray()
+            //     : Categorie::with('children')->where('slug', $identifier)->first()->toArray();
+    
+            //     echo '<pre>';
+            //     print_r($categorie);
+            //     die();
+                $categorie = is_numeric($identifier) 
+                ? Categorie::with('children')->where('id', $identifier)->first()
+                : Categorie::with('children')->where('slug', $identifier)->first();
+    
+            if (!$categorie) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Categorie not found'
+                ], 404);
+            }
+    
             return response()->json([
                 'success' => true,
-                'data' => $categories
+                'data' => $categorie
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
-        } 
+        }
     }
-
 
 
     public function removeCategory(Request $request, $id)

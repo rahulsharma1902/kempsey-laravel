@@ -14,15 +14,19 @@ return new class extends Migration
         Schema::create('stores', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('slug');
+            $table->string('image');
             $table->string('address');
             $table->string('postal_code');
             $table->string('city');
             $table->string('state');
             $table->string('country');
-            $table->string('phone_number');
+            $table->string('phone');
             $table->string('email')->nullable();
             $table->decimal('latitude', 10, 7);
             $table->decimal('longitude', 10, 7);
+            $table->longtext('details');
+
             $table->timestamps();
         });
         

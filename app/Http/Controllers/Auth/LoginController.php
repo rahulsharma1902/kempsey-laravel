@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Cart;
 
 class LoginController extends Controller
 {
@@ -27,11 +28,20 @@ class LoginController extends Controller
 
         $user = Auth::user();
         $token = $user->createToken('Personal Access Token')->plainTextToken;
-
+        if($request->tempId){
+            $this->convertTemporaryIdToUserId($request->tempId);
+        }
         return response()->json([
             'message' => 'Login successful',
             'user' => $user,
             'token' => $token
         ]);
+    }
+    function convertTemporaryIdToUserId($tempId)
+    {
+        $temporaryUserId = $tempId;
+        if ($temporaryUserId) {
+            Cart::where('temp_id', $temporaryUserId)->update(['user_id' => Auth::id(), 'temp_id' => null]);
+        }
     }
 }

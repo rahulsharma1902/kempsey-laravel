@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Categorie;
 use App\Models\Product;
 use Illuminate\Support\Facades\Storage;
 
@@ -163,10 +164,35 @@ class ProductsController extends Controller
     }
 
 
-    public function getProductById(Request $request, $id){
-        try {
-            $product = Product::where('id',$id)->first();
+    // public function getProductById(Request $request, $id){
+    //     try {
+    //         $product = Product::where('id',$id)->first();
 
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => $product
+    //         ], 200);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'An error occurred: ' . $e->getMessage()
+    //         ], 500);
+    //     } 
+    // }
+    public function getProductById(Request $request, $identifier)
+    {
+        try {
+            $product = is_numeric($identifier) 
+                ? Product::where('id', $identifier)->with('Categorie','Brand')->first()
+                : Product::where('slug', $identifier)->with('Categorie','Brand')->first();
+    
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Product not found'
+                ], 404);
+            }
+    
             return response()->json([
                 'success' => true,
                 'data' => $product
@@ -176,9 +202,47 @@ class ProductsController extends Controller
                 'success' => false,
                 'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
-        } 
+        }
     }
-
+    
+    public function getProductByCategory(Request $request, $slug)
+    {
+        try {
+            $category = Categorie::where('slug', $slug)->first();
+    
+            if (!$category) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Category not found'
+                ], 404);
+            }
+    
+            $categoryIds = Categorie::where('id', $category->id)
+                ->orWhere('parent_id', $category->id)
+                ->pluck('id')->toArray();
+    
+            $products = Product::whereIn('category_id', $categoryIds)->with('Categorie','Brand')->get();
+    
+            if ($products->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No products found in this category and its subcategories'
+                ], 404);
+            }
+    
+            return response()->json([
+                'success' => true,
+                'data' => $products
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    
 
 
 
